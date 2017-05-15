@@ -37,6 +37,7 @@ static char* opt_color = NULL;
 static char* opt_zoom  = NULL;
 static char* opt_wpt_type = NULL;
 static char* opt_radius = NULL;
+static char* opt_lineweight = NULL;
 
 static short output_type_num = 0;
 static short opt_zoom_num = 0;
@@ -47,6 +48,9 @@ static long def_color_num = color_to_bbggrr("red");
 static short wpt_type_num = 0;
 static short last_read_type = 0;
 static double radius = 0.0;
+
+static long opt_lineweight_num = -1;  // "unset" when < 0
+static long def_lineweight_num = 6;
 
 static long serial=10000;
 static long rtserial=1;
@@ -95,6 +99,10 @@ arglist_t an1_args[] = {
   },
   {
     "radius", &opt_radius, "Radius for circles",
+    NULL, ARGTYPE_STRING, ARG_NOMINMAX
+  },
+  {
+    "lineweight", &opt_lineweight, "Width of lines (pixels)",
     NULL, ARGTYPE_STRING, ARG_NOMINMAX
   },
   ARG_TERMINATOR
@@ -983,7 +991,9 @@ Write_One_AN1_Line(const route_head* rte)
       rec->unk2 = 1048576;
       rec->type = 2;
       rec->unk4 = 2;
-      rec->lineweight = 6;
+      rec->lineweight = ((opt_lineweight_num > 0) ? opt_lineweight_num 
+		      : ((rte->line_width > 0 ? rte->line_width                  
+		      : def_lineweight_num)));                    /* 6 */
       rec->linecolor = ((opt_color_num >= 0) ? opt_color_num 
 		      : ((rte->line_color.bbggrr >= 0) ? rte->line_color.bbggrr 
 		      : def_color_num));                          /* red */
@@ -997,7 +1007,8 @@ Write_One_AN1_Line(const route_head* rte)
       rec->unk2 = 1048576;
       rec->type = 2;
       rec->unk4 = 2;
-      rec->lineweight = 6;
+      rec->lineweight = ((opt_lineweight_num > 0) ? opt_lineweight_num 
+		      : def_lineweight_num);                /* 6 */
       rec->linecolor = (opt_color_num >= 0 ? opt_color_num 
 		      : def_color_num);                     /* red */
       rec->opacity = 3;
@@ -1246,6 +1257,9 @@ wr_init(const QString& fname)
     if (!strchr(opt_radius,'k') && !strchr(opt_radius,'K')) {
       radius *= 5280*12*2.54/100000;
     }
+  }
+  if (opt_lineweight) {
+    opt_lineweight_num = atof(opt_lineweight);
   }
 }
 
