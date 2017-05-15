@@ -40,7 +40,10 @@ static char* opt_radius = NULL;
 
 static short output_type_num = 0;
 static short opt_zoom_num = 0;
-static long opt_color_num = 0;
+
+static long opt_color_num = -1;  // "unset" when < 0
+static long def_color_num = color_to_bbggrr("red");
+
 static short wpt_type_num = 0;
 static short last_read_type = 0;
 static double radius = 0.0;
@@ -79,7 +82,7 @@ arglist_t an1_args[] = {
   },
   {
     "color", &opt_color, "Color for lines or mapnotes",
-    "red", ARGTYPE_STRING, ARG_NOMINMAX
+    NULL, ARGTYPE_STRING, ARG_NOMINMAX
   },
   {
     "zoom", &opt_zoom, "Zoom level to reduce points",
@@ -757,7 +760,8 @@ Write_One_AN1_Waypoint(const Waypoint* wpt)
     rec->unk2 = 3;
     rec->unk3 = 18561;
     rec->radius = radius;
-    rec->fillcolor = opt_color_num;
+    rec->fillcolor = (opt_color_num >= 0 ? opt_color_num 
+		    : def_color_num);
     rec->fillflags = 3;
     if (wpt_type_num == 5) {
       rec->fillflags = 0x8200;
@@ -975,6 +979,18 @@ Write_One_AN1_Line(const route_head* rte)
       break;
 
     case 0: /* drawing */
+      rec->roadtype = 0x48800015;
+      rec->unk2 = 1048576;
+      rec->type = 2;
+      rec->unk4 = 2;
+      rec->lineweight = 6;
+      rec->linecolor = ((opt_color_num >= 0) ? opt_color_num 
+		      : ((rte->line_color.bbggrr >= 0) ? rte->line_color.bbggrr 
+		      : def_color_num));                          /* red */
+      rec->opacity = 3;
+      rec->unk8 = 2;
+      break;
+
     case 3: /* waypoint - shouldn't have lines */
     default:
       rec->roadtype = 0x48800015;
@@ -982,7 +998,8 @@ Write_One_AN1_Line(const route_head* rte)
       rec->type = 2;
       rec->unk4 = 2;
       rec->lineweight = 6;
-      rec->linecolor = opt_color_num; /* red */
+      rec->linecolor = (opt_color_num >= 0 ? opt_color_num 
+		      : def_color_num);                     /* red */
       rec->opacity = 3;
       rec->unk8 = 2;
       break;
@@ -1216,7 +1233,9 @@ wr_init(const QString& fname)
   outfile = gbfopen_le(fname, "wb", MYNAME);
   Init_Output_Type();
   Init_Road_Changes();
-  opt_color_num = color_to_bbggrr(opt_color);
+  if (opt_color) {
+    opt_color_num = color_to_bbggrr(opt_color);
+  }
   Init_Wpt_Type();
   if (opt_zoom) {
     opt_zoom_num = atoi(opt_zoom);
