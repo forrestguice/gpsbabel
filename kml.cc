@@ -83,6 +83,7 @@ static Waypoint* wpt_tmp;
 static int wpt_tmp_queued;
 static QString posnfilename;
 static QString posnfilenametmp;
+static kml_style* wpt_style_tmp;
 
 static route_head* gx_trk_head;
 static QList<gpsbabel::DateTime>* gx_trk_times;
@@ -267,7 +268,7 @@ static void kml_step_color(void)
 }
 
 static xg_callback wpt_s, wpt_e;
-static xg_callback wpt_name, wpt_desc, wpt_coord, wpt_icon, trk_coord, wpt_time;
+static xg_callback wpt_name, wpt_desc, wpt_coord, wpt_icon, trk_coord, wpt_time, wpt_styleUrl;
 static xg_callback gx_trk_s, gx_trk_e;
 static xg_callback gx_trk_when, gx_trk_coord;
 
@@ -293,6 +294,7 @@ xg_tag_mapping kml_map[] = {
   { trk_coord, 	cb_cdata, 	"/Placemark/GeometryCollection/LineString/coordinates" },
   { trk_coord, 	cb_cdata, 	"/Placemark/Polygon/outerBoundaryIs/LinearRing/coordinates" },
   { trk_coord, 	cb_cdata, 	"/Placemark/LineString/coordinates" },
+  { wpt_styleUrl, cb_cdata, 	"/Placemark/styleUrl" },
   { gx_trk_s,  	cb_start, 	"/Placemark/*gx:Track" },
   { gx_trk_e,  	cb_end, 	"/Placemark/*gx:Track" },
   { gx_trk_when,  cb_cdata, "/Placemark/*gx:Track/when" },
@@ -391,6 +393,28 @@ void stylemap_pair_styleUrl( xg_string args, const QXmlStreamAttributes* )
 static kml_style* style_tmp;
 static QHash<QString, kml_style*> styles;
 
+kml_style* resolveStyle( const QString &styleId )
+{
+  QString id = QString(styleId);
+  if (id.startsWith("#"))
+  {
+    id.remove(0,1);
+  }
+
+  if (styles.contains(id)) 
+  {
+    return styles.value(id);
+
+  } else if (stylemaps.contains(id)) {
+    kml_stylemap* map = stylemaps.value(id);
+    return resolveStyle(map->pairs.value("normal"));
+
+  } else {
+    warning( QString("unable to resolve style " + id + "\n").toStdString().c_str() );
+    return NULL;
+  }
+}
+
 void style_s( xg_string, const QXmlStreamAttributes* attrs)
 {
   if (style_tmp) {
@@ -447,6 +471,7 @@ void wpt_s(xg_string, const QXmlStreamAttributes*)
   }
   wpt_tmp = new Waypoint;
   wpt_tmp_queued = 0;
+  wpt_style_tmp = NULL;
 }
 
 void wpt_e(xg_string, const QXmlStreamAttributes*)
@@ -511,6 +536,11 @@ void wpt_icon(xg_string args, const QXmlStreamAttributes*)
   if (wpt_tmp)  {
     wpt_tmp->icon_descr = args;
   }
+}
+
+void wpt_styleUrl(xg_string args, const QXmlStreamAttributes*)
+{
+  wpt_style_tmp = resolveStyle(args);
 }
 
 void trk_coord(xg_string args, const QXmlStreamAttributes*)
