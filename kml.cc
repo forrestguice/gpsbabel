@@ -36,6 +36,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+struct kml_stylemap {
+  QString id = QString("default");
+  QHash<QString, QString> pairs;
+  QString tmp_key = QString("normal");
+  QString tmp_styleUrl;
+};
+
 struct kml_style {
   QString id = QString("default");
   gb_color line_color;
@@ -264,6 +271,10 @@ static xg_callback wpt_name, wpt_desc, wpt_coord, wpt_icon, trk_coord, wpt_time;
 static xg_callback gx_trk_s, gx_trk_e;
 static xg_callback gx_trk_when, gx_trk_coord;
 
+static xg_callback stylemap_s, stylemap_e;
+static xg_callback stylemap_pair_s, stylemap_pair_e; 
+static xg_callback stylemap_pair_key, stylemap_pair_styleUrl;
+
 static xg_callback style_s, style_e;
 static xg_callback style_linestyle_color, style_linestyle_width;
 
@@ -291,6 +302,14 @@ xg_tag_mapping kml_map[] = {
   { style_e,	cb_end, 	"/Style" },
   { style_linestyle_color, cb_cdata, "/Style/LineStyle/color" },
   { style_linestyle_width, cb_cdata, "/Style/LineStyle/width" },
+
+  { stylemap_s,	cb_start, 	"/StyleMap" },
+  { stylemap_e,	cb_end, 	"/StyleMap" },
+  { stylemap_pair_s, cb_start, 	"/StyleMap/Pair" },
+  { stylemap_pair_e, cb_end, 	"/StyleMap/Pair" },
+  { stylemap_pair_key, cb_cdata, "/StyleMap/Pair/key" },
+  { stylemap_pair_styleUrl, cb_cdata, "/StyleMap/Pair/styleUrl" },
+
   { NULL,	(xg_cb_type) 0, 		NULL }
 };
 
@@ -301,6 +320,69 @@ const char* kml_tags_to_ignore[] = {
   "Folder",
   NULL,
 };
+
+/**
+ * StyleMaps
+ */
+
+static kml_stylemap* stylemap_tmp;
+static QHash<QString, kml_stylemap*> stylemaps;
+
+void stylemap_s( xg_string, const QXmlStreamAttributes* attrs )
+{
+  if (stylemap_tmp) {
+    fatal(MYNAME ": stylemap_s: invalid kml file\n");
+  }
+  stylemap_tmp = new kml_stylemap;
+  if (attrs && attrs->hasAttribute("id"))
+  {
+    foreach(const QXmlStreamAttribute &attr, *attrs) 
+    {
+      if (attr.name().toString() == QLatin1String("id")) 
+      {
+        stylemap_tmp->id = attr.value().toString();
+	break;
+      }
+    }
+  }
+}
+void stylemap_e( xg_string, const QXmlStreamAttributes* )
+{
+  if (!stylemap_tmp) {
+    fatal(MYNAME ": stylemap_e: invalid kml file\n");
+  }
+  stylemaps[stylemap_tmp->id] = stylemap_tmp;
+  stylemap_tmp = NULL;
+}
+void stylemap_pair_s( xg_string, const QXmlStreamAttributes* )
+{
+  if (!stylemap_tmp) {
+    fatal(MYNAME ": stylemap_pair_s: invalid kml file\n");
+  }
+  stylemap_tmp->tmp_key = QString("");
+  stylemap_tmp->tmp_styleUrl = "";
+}
+void stylemap_pair_e( xg_string, const QXmlStreamAttributes* )
+{
+  if (!stylemap_tmp) {
+    fatal(MYNAME ": stylemap_pair_e: invalid kml file\n");
+  }
+  stylemap_tmp->pairs[stylemap_tmp->tmp_key] = stylemap_tmp->tmp_styleUrl;
+}
+void stylemap_pair_key( xg_string args, const QXmlStreamAttributes* )
+{
+  if (!stylemap_tmp) {
+    fatal(MYNAME ": stylemap_pair_key: invalid kml file\n");
+  }
+  stylemap_tmp->tmp_key = args;
+}
+void stylemap_pair_styleUrl( xg_string args, const QXmlStreamAttributes* )
+{
+  if (!stylemap_tmp) {
+    fatal(MYNAME ": stylemap_pair_styleUrl: invalid kml file\n");
+  }
+  stylemap_tmp->tmp_styleUrl = args;
+}
 
 /**
  * Styles
