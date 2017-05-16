@@ -36,6 +36,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+struct kml_style {
+  QString id = QString("default");
+  gb_color line_color;
+  float line_width = 1.0;
+};
+
 // options
 static char* opt_deficon = NULL;
 static char* opt_export_lines = NULL;
@@ -258,6 +264,9 @@ static xg_callback wpt_name, wpt_desc, wpt_coord, wpt_icon, trk_coord, wpt_time;
 static xg_callback gx_trk_s, gx_trk_e;
 static xg_callback gx_trk_when, gx_trk_coord;
 
+static xg_callback style_s, style_e;
+static xg_callback style_linestyle_color, style_linestyle_width;
+
 static
 xg_tag_mapping kml_map[] = {
   { wpt_s, 	cb_start, 	"/Placemark" },
@@ -277,6 +286,11 @@ xg_tag_mapping kml_map[] = {
   { gx_trk_e,  	cb_end, 	"/Placemark/*gx:Track" },
   { gx_trk_when,  cb_cdata, "/Placemark/*gx:Track/when" },
   { gx_trk_coord, cb_cdata, "/Placemark/*gx:Track/gx:coord" },
+
+  { style_s,	cb_start, 	"/Style" },
+  { style_e,	cb_end, 	"/Style" },
+  { style_linestyle_color, cb_cdata, "/Style/LineStyle/color" },
+  { style_linestyle_width, cb_cdata, "/Style/LineStyle/width" },
   { NULL,	(xg_cb_type) 0, 		NULL }
 };
 
@@ -288,6 +302,62 @@ const char* kml_tags_to_ignore[] = {
   NULL,
 };
 
+/**
+ * Styles
+ */
+
+static kml_style* style_tmp;
+static QHash<QString, kml_style*> styles;
+
+void style_s( xg_string, const QXmlStreamAttributes* attrs)
+{
+  if (style_tmp) {
+    fatal(MYNAME ": style_s: invalid kml file\n");
+  }
+  style_tmp = new kml_style;
+  if (attrs && attrs->hasAttribute("id"))
+  {
+    foreach(const QXmlStreamAttribute &attr, *attrs) 
+    {
+      if (attr.name().toString() == QLatin1String("id")) 
+      {
+        style_tmp->id = attr.value().toString();
+	break;
+      }
+    }
+  }
+}
+void style_e( xg_string, const QXmlStreamAttributes* )
+{
+  if (!style_tmp) {
+    fatal(MYNAME ": style_e: invalid kml file\n");
+  }
+  styles[style_tmp->id] = style_tmp;
+  style_tmp = NULL;
+}
+void style_linestyle_color( xg_string args, const QXmlStreamAttributes* )
+{
+  if (!style_tmp) {
+    fatal(MYNAME ": style_linestyle_color: invalid kml file\n");
+  }
+
+  QString colorStr = args;           // color stored in format aabbggrr
+  char *colorStrData = colorStr.toLatin1().data();
+  std::reverse(colorStrData, colorStrData + colorStr.length());
+  colorStr = QString(colorStrData);  // but we need it as rrggbbaa
+
+  if (!colorStr.startsWith("#")) {  
+    colorStr = "#" + colorStr;
+  }
+  style_tmp->line_color.bbggrr = color_to_bbggrr(colorStr.toLatin1().data());
+}
+void style_linestyle_width( xg_string args, const QXmlStreamAttributes* )
+{
+  if (!style_tmp) {
+    fatal(MYNAME ": style_linestyle_width: invalid kml file\n");
+  }
+  style_tmp->line_width = args.toFloat();
+}
 void wpt_s(xg_string, const QXmlStreamAttributes*)
 {
   if (wpt_tmp) {
