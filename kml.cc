@@ -464,6 +464,11 @@ void style_linestyle_width( xg_string args, const QXmlStreamAttributes* )
   }
   style_tmp->line_width = args.toFloat();
 }
+
+/**
+ * Placemarks
+ */
+
 void wpt_s(xg_string, const QXmlStreamAttributes*)
 {
   if (wpt_tmp) {
@@ -556,6 +561,13 @@ void trk_coord(xg_string args, const QXmlStreamAttributes*)
   if (wpt_tmp && !wpt_tmp->shortname.isEmpty()) {
     trk_head->rte_name  = wpt_tmp->shortname;
   }
+
+  if (wpt_style_tmp)
+  {
+    trk_head->line_width = wpt_style_tmp->line_width;
+    trk_head->line_color.bbggrr = wpt_style_tmp->line_color.bbggrr;
+  }
+
   track_add_head(trk_head);
   while ((n = sscanf(CSTRc(iargs), "%lf,%lf,%lf%n", &lon, &lat, &alt, &consumed)) > 0) {
     trkpt = new Waypoint;
